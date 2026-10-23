@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Beginner CTF</title>
+<!-- maintainer note: CTF{view_source_is_your_friend} -->
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#12142b; --panel:#1b1e3d; --panel2:#23274c; --ink:#e8eaf8; --muted:#9aa0c8;
+  --line:#2f3463; --accent:#ff6b8b; --accent-ink:#2a0f19; --ok:#7be0d0; --bad:#ff9a8b;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:980px;margin:0 auto;padding:28px 18px 60px}
+header h1{font-size:clamp(28px,5vw,40px);margin:0 0 6px;letter-spacing:-.01em}
+header p{margin:0;color:var(--muted);max-width:60ch}
+.hud{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:24px 0}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.stat small{display:block;color:var(--muted);font-size:13px}
+.stat b{font-size:26px}
+.stat input{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);padding:4px 0;font-size:18px;font-weight:600}
+.bar{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--ok);width:0;transition:width .3s}
+h2{font-size:15px;color:var(--muted);font-weight:600;margin:28px 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.card{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.card:hover{border-color:var(--accent)}
+.card .t{font-weight:650}
+.card .p{color:var(--muted);font-size:14px}
+.card.solved{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,var(--panel))}
+.card.solved .p{color:var(--ok)}
+dialog{width:min(560px,92vw);background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:0}
+dialog::backdrop{background:rgba(6,7,20,.7)}
+.dlg{padding:22px;display:flex;flex-direction:column;gap:14px}
+.dlg h3{margin:0;font-size:22px}
+.meta{color:var(--muted);font-size:14px}
+.pay{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;word-break:break-all;user-select:all}
+.row{display:flex;gap:8px}
+.row input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-family:ui-monospace,Menlo,Consolas,monospace}
+.btn{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:9px 14px}
+.btn:hover{border-color:var(--accent)}
+.btn.go{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:650}
+.hint{background:var(--panel2);border-radius:10px;padding:10px 12px;font-size:15px}
+.msg{min-height:1.4em;font-size:15px}
+.msg.ok{color:var(--ok)} .msg.bad{color:var(--bad)}
+footer{margin-top:40px;color:var(--muted);font-size:13px;max-width:70ch}
+footer button{background:none;border:0;color:var(--muted);text-decoration:underline;padding:0}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Beginner CTF</h1>
+    <p>Nine challenges across web, crypto, encoding, forensics and hashes. Find each flag, which looks like <code>CTF{...}</code>, and submit it to score points.</p>
+  </header>
+
+  <section class="hud" aria-label="Your progress">
+    <div class="stat"><small>Player</small><input id="handle" maxlength="20" placeholder="Choose a handle" aria-label="Player handle"></div>
+    <div class="stat"><small>Score</small><b id="score">0</b></div>
+    <div class="stat"><small id="solvedLabel">Solved</small><b id="solved">0</b><div class="bar"><i id="fill"></i></div></div>
+  </section>
+
+  <div id="board"></div>
+
+  <footer>
+    <p>Progress is saved in this browser only, so there is no shared leaderboard. Flags are checked by comparing SHA-256 hashes in your browser. Each hint you reveal costs 5 points on that challenge.</p>
+    <p><button id="reset">Reset all progress</button></p>
+  </footer>
+</div>
+
+<dialog id="dlg" aria-labelledby="dt">
+  <div class="dlg">
+    <div><h3 id="dt"></h3><div class="meta" id="dm"></div></div>
+    <p id="dd" style="margin:0"></p>
+    <div id="pay" class="pay" hidden></div>
+    <div id="hints"></div>
+    <button class="btn" id="hintBtn"></button>
+    <form class="row" id="form" autocomplete="off">
+      <input id="flag" placeholder="CTF{...}" aria-label="Flag" spellcheck="false">
+      <button class="btn go" type="submit">Submit</button>
+    </form>
+    <div class="msg" id="msg" role="status"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="close" type="button">Close</button></div>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  var D=[{"id": 1, "cat": "Web", "pts": 10, "title": "Read the Room", "desc": "The flag is sitting somewhere in this very page. Developers leave notes in places visitors don\u2019t normally look.", "hints": ["Your browser can show you the raw HTML of any page.", "Look for text the browser doesn\u2019t display: HTML comments."], "h": "1e21dc3c6eed20614d6b77d8510686dd7416bfe866ad20aa2b6ce6587a258cc7", "payload": ""}, {"id": 2, "cat": "Encoding", "pts": 10, "title": "Not a Secret", "desc": "A teammate swore this was encrypted. Prove them wrong.", "payload": "Q1RGe2Jhc2U2NF9pc19ub3RfZW5jcnlwdGlvbn0=", "hints": ["Letters, digits, and an equals sign at the end are a classic sign of one encoding.", "Base64. Try atob() in the console or any decoder."], "h": "4fbf02b63c5c7dd0a8200afa293e613979441271c93b8fff1e034a631193884d"}, {"id": 3, "cat": "Crypto", "pts": 20, "title": "Hail, Caesar", "desc": "Julius sent this note with every letter pushed the same distance along the alphabet. Digits and symbols stay put.", "payload": "JAM{yvtl_dhzua_ibpsa_pu_h_khf}", "hints": ["The flag starts with CTF. What does that look like after shifting?", "The shift is 7. Move each letter back by 7."], "h": "03ba94f19790ac4f56fa548f107698668ae6969ea3b01c8976179ec17bef9347"}, {"id": 4, "cat": "Encoding", "pts": 20, "title": "Backwards Bytes", "desc": "Someone hex-encoded this message, but the decoded text still looks wrong.", "payload": "7d65646f6365645f6e6568745f657372657665727b465443", "hints": ["Decode the hex to text first.", "The result is reversed. Flip it."], "h": "7d2e36897efb1d15e4ee279f829592549305c018760b1d7dc676b43c84b9d20b"}, {"id": 5, "cat": "Web", "pts": 30, "title": "Cookie Jar", "desc": "This site left a note for you in your browser\u2019s storage. Find it. The name starts with ctf.", "hints": ["Open developer tools (F12) and look for an Application or Storage tab.", "Check Cookies and Local Storage for this site. The key is ctf_secret_note."], "h": "f79d019b29c1abfa208608c73080e74bf134cb85837549bb391de5ed8c1adaff", "payload": ""}, {"id": 6, "cat": "Crypto", "pts": 40, "title": "One-Byte Wonder", "desc": "Every byte of the flag was XORed with the same single byte, then written as hex.", "payload": "697e6c5152455875435975435e5975455d447543445c4f58594f57", "hints": ["You know the plaintext begins with C, T, F, {. XOR the first byte with C to recover the key.", "The key is 0x2a (42). XOR every byte with it."], "h": "7f7748299b001b4092affe3f909998261766689c18f1cec0ea7b37fa52ada020"}, {"id": 7, "cat": "Crypto", "pts": 50, "title": "Lemon Squeezer", "desc": "A Vigen\u00e8re cipher: a Caesar shift that changes with every letter. Non-letters are skipped and don\u2019t use up the key.", "payload": "NXR{jvrizsep_rqsqd_e_wsl}", "hints": ["Each key letter is a shift: A=0, B=1, and so on.", "The key is a fruit that is also yellow: LEMON."], "h": "83345fc6ec48292667ffa7066c8e5ad844624bf77cae1892e18988b56afa14ee"}, {"id": 8, "cat": "Forensics", "pts": 50, "title": "Invisible Ink", "desc": "Copy the text below. It says nothing, but it is longer than it looks.", "payload": "Nothing to see here.\u200b\u200c\u200b\u200b\u200b\u200b\u200c\u200c\u200b\u200c\u200b\u200c\u200b\u200c\u200b\u200b\u200b\u200c\u200b\u200b\u200b\u200c\u200c\u200b\u200b\u200c\u200c\u200c\u200c\u200b\u200c\u200c\u200b\u200c\u200c\u200c\u200c\u200b\u200c\u200b\u200b\u200c\u200c\u200b\u200b\u200c\u200b\u200c\u200b\u200c\u200c\u200c\u200b\u200b\u200c\u200b\u200b\u200c\u200c\u200b\u200c\u200c\u200c\u200c\u200b\u200c\u200b\u200c\u200c\u200c\u200c\u200c\u200b\u200c\u200c\u200c\u200b\u200c\u200c\u200c\u200b\u200c\u200c\u200b\u200c\u200b\u200b\u200c\u200b\u200c\u200c\u200b\u200b\u200c\u200b\u200b\u200b\u200c\u200c\u200c\u200b\u200c\u200b\u200b\u200b\u200c\u200c\u200b\u200c\u200b\u200b\u200b\u200b\u200c\u200b\u200c\u200c\u200c\u200c\u200c\u200b\u200c\u200c\u200b\u200b\u200c\u200c\u200c\u200b\u200c\u200c\u200b\u200c\u200b\u200b\u200b\u200b\u200c\u200c\u200b\u200c\u200c\u200c\u200c\u200b\u200c\u200c\u200c\u200b\u200b\u200c\u200c\u200b\u200c\u200c\u200c\u200b\u200c\u200b\u200b\u200b\u200c\u200c\u200c\u200b\u200b\u200c\u200c\u200b\u200c\u200c\u200c\u200c\u200c\u200b\u200c", "hints": ["Paste it into the console and check .length, or print its character codes.", "Two invisible characters (U+200B and U+200C) act as 0 and 1. Group them in 8s to get ASCII."], "h": "2b56d265b4ef253324fa0c09ebad64f98a3a385efa031a6ffd0a78267fda54e4"}, {"id": 9, "cat": "Hashes", "pts": 20, "title": "Crack the Digest", "desc": "This is the SHA-256 hash of an extremely common password. Recover it and wrap it in the flag format CTF{...}.", "payload": "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8", "hints": ["Hashes can\u2019t be reversed, but you can hash guesses and compare.", "Search the hash online or try the most common password there is."], "h": "2596269b1cfe480536808b82adf47ae3a783b69442c775c8e6fd6456dcd46fbb"}], KEY="ctf.v1", COST=5;
+  var S={handle:"",solved:{},hints:{}};
+  var $=function(i){return document.getElementById(i)};
+  var cur=null;
+
+  try{var r=localStorage.getItem(KEY); if(r) S=Object.assign(S,JSON.parse(r));}catch(e){}
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+
+  // Plants the note for the "Cookie Jar" challenge.
+  (function(){
+    var v="}resworb_ruoy_ni_evil_seikooc{FTC".split("").reverse().join("");
+    try{document.cookie="ctf_secret_note="+v+"; path=/; max-age=31536000; SameSite=Lax"}catch(e){}
+    try{localStorage.setItem("ctf_secret_note",v)}catch(e){}
+  })();
+
+  function sha(s){
+    if(!(window.crypto&&crypto.subtle)) return Promise.reject(new Error("no-subtle"));
+    return crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)).then(function(b){
+      return Array.prototype.map.call(new Uint8Array(b),function(x){return ("0"+x.toString(16)).slice(-2)}).join("");
+    });
+  }
+  function award(c){var h=S.hints[c.id]||0; return Math.max(c.pts-h*COST,Math.ceil(c.pts/2))}
+
+  function render(){
+    var cats=[],byCat={};
+    D.forEach(function(c){if(!byCat[c.cat]){byCat[c.cat]=[];cats.push(c.cat)} byCat[c.cat].push(c)});
+    var box=$("board"); box.innerHTML="";
+    cats.forEach(function(cat){
+      var h=document.createElement("h2"); h.textContent=cat; box.appendChild(h);
+      var g=document.createElement("div"); g.className="grid";
+      byCat[cat].sort(function(a,b){return a.pts-b.pts}).forEach(function(c){
+        var b=document.createElement("button"), done=S.solved[c.id];
+        b.className="card"+(done?" solved":"");
+        var t=document.createElement("span"); t.className="t"; t.textContent=c.title;
+        var p=document.createElement("span"); p.className="p";
+        p.textContent=done?"Solved, "+done+" points":c.pts+" points";
+        b.appendChild(t); b.appendChild(p);
+        b.onclick=function(){openC(c)};
+        g.appendChild(b);
+      });
+      box.appendChild(g);
+    });
+    var n=Object.keys(S.solved).length, total=0;
+    Object.keys(S.solved).forEach(function(k){total+=S.solved[k]});
+    $("score").textContent=total;
+    $("solved").textContent=n+" / "+D.length;
+    $("fill").style.width=(n/D.length*100)+"%";
+    $("handle").value=S.handle;
+  }
+
+  function showHints(){
+    var n=S.hints[cur.id]||0, box=$("hints"); box.innerHTML="";
+    for(var i=0;i<n;i++){var d=document.createElement("div"); d.className="hint"; d.style.marginBottom="8px"; d.textContent="Hint "+(i+1)+": "+cur.hints[i]; box.appendChild(d)}
+    var b=$("hintBtn");
+    if(S.solved[cur.id]||n>=cur.hints.length){b.hidden=true}
+    else{b.hidden=false; b.textContent="Reveal hint "+(n+1)+" (costs "+COST+" points)"}
+  }
+  function openC(c){
+    cur=c; $("dt").textContent=c.title;
+    $("dm").textContent=c.cat+", "+c.pts+" points";
+    $("dd").textContent=c.desc;
+    var p=$("pay"); if(c.payload){p.hidden=false; p.textContent=c.payload}else{p.hidden=true}
+    $("flag").value=""; $("msg").textContent=""; $("msg").className="msg";
+    if(S.solved[c.id]){$("msg").textContent="Already solved for "+S.solved[c.id]+" points."; $("msg").className="msg ok"}
+    showHints(); $("dlg").showModal(); $("flag").focus();
+  }
+
+  $("hintBtn").onclick=function(){S.hints[cur.id]=(S.hints[cur.id]||0)+1; save(); showHints()};
+  $("close").onclick=function(){$("dlg").close()};
+  $("form").onsubmit=function(e){
+    e.preventDefault(); var v=$("flag").value.trim(), m=$("msg");
+    if(!v) return;
+    if(S.solved[cur.id]){m.textContent="You already solved this one."; m.className="msg ok"; return}
+    sha(v).then(function(h){
+      if(h===cur.h){
+        var pts=award(cur); S.solved[cur.id]=pts; save(); render(); showHints();
+        m.textContent="Correct. +"+pts+" points."; m.className="msg ok";
+      }else{
+        m.textContent=/^CTF\{.+\}$/.test(v)?"Not quite. Check your decoding and try again.":"Flags look like CTF{...}. Include the braces.";
+        m.className="msg bad";
+      }
+    }).catch(function(){m.textContent="Your browser can’t compute hashes here. Open the site over https."; m.className="msg bad"});
+  };
+  $("handle").oninput=function(){S.handle=this.value; save()};
+  $("reset").onclick=function(){
+    if(confirm("Clear your score, solved challenges, and hints?")){S={handle:S.handle,solved:{},hints:{}}; save(); render()}
+  };
+
+  render();
+})();
+</script>
+</body>
+</html>
